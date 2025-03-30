@@ -3,10 +3,41 @@ local LocalPlayer = Players.LocalPlayer
 local mouse = LocalPlayer:GetMouse()
 local camera = game.Workspace.CurrentCamera
 
-local aimbotEnabled = true -- Set to false to disable aimbot
-local maxDistance = 100 -- Maximum distance for aimbot targeting
+local ESPEnabled = false
+local AimbotEnabled = true
+local maxDistance = 100  -- Max targeting distance
 
--- Function to find the closest player
+-- ESP Code
+local function createESP(character)
+    if not character or character:FindFirstChild("ESPBox") then return end
+    local highlight = Instance.new("Highlight")
+    highlight.Name = "ESPBox"
+    highlight.Parent = character
+    highlight.FillColor = Color3.fromRGB(255, 0, 0) -- Red
+    highlight.FillTransparency = 0.5
+    highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+    highlight.OutlineTransparency = 0.2
+end
+
+local function toggleESP()
+    ESPEnabled = not ESPEnabled
+    if ESPEnabled then
+        for _, player in pairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer and player.Character then
+                createESP(player.Character)
+            end
+        end
+    else
+        for _, player in pairs(Players:GetPlayers()) do
+            if player.Character then
+                local espBox = player.Character:FindFirstChild("ESPBox")
+                if espBox then espBox:Destroy() end
+            end
+        end
+    end
+end
+
+-- Aimbot Code
 local function getClosestPlayer()
     local closestPlayer = nil
     local shortestDistance = maxDistance
@@ -15,11 +46,10 @@ local function getClosestPlayer()
     for _, player in pairs(Players:GetPlayers()) do
         if player.Character and player ~= LocalPlayer then
             local character = player.Character
-            local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
-            
-            if humanoidRootPart then
-                local distance = (camera.CFrame.p - humanoidRootPart.Position).Magnitude
-                
+            local head = character:FindFirstChild("Head")
+           
+            if head then
+                local distance = (camera.CFrame.p - head.Position).Magnitude
                 if distance < shortestDistance then
                     shortestDistance = distance
                     closestPlayer = player
@@ -31,17 +61,16 @@ local function getClosestPlayer()
     return closestPlayer
 end
 
--- Function to aim at the closest player
 local function aimbot()
-    if not aimbotEnabled then return end
-    
+    if not AimbotEnabled then return end
+
     local closestPlayer = getClosestPlayer()
     if closestPlayer and closestPlayer.Character then
         local character = closestPlayer.Character
-        local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
-        
-        if humanoidRootPart then
-            local aimPosition = humanoidRootPart.Position
+        local head = character:FindFirstChild("Head")
+
+        if head then
+            local aimPosition = head.Position
             local direction = (aimPosition - camera.CFrame.p).unit
             camera.CFrame = CFrame.new(camera.CFrame.p, aimPosition)
         end
@@ -50,7 +79,19 @@ end
 
 -- Update every frame
 game:GetService("RunService").RenderStepped:Connect(function()
-    if aimbotEnabled then
+    if AimbotEnabled then
         aimbot()
     end
+end)
+
+-- Toggle ESP button (example)
+local button = Instance.new("TextButton")
+button.Size = UDim2.new(0, 150, 0, 50)
+button.Position = UDim2.new(0.05, 0, 0.85, 0)
+button.Text = "ESP: OFF"
+button.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui")
+
+button.MouseButton1Click:Connect(function()
+    toggleESP()
+    button.Text = ESPEnabled and "ESP: ON" or "ESP: OFF"
 end)

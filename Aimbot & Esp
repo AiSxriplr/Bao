@@ -1,0 +1,137 @@
+local Players, RunService, LocalPlayer, mouse = game:GetService("Players"), game:GetService("RunService"), game.Players.LocalPlayer, game:GetService("Players").LocalPlayer:GetMouse()
+
+-- Create UI
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Parent = game:GetService("CoreGui")
+
+-- Create ESP and Aimbot Buttons
+local ESPButton, AimbotButton = Instance.new("TextButton"), Instance.new("TextButton")
+ESPButton.Size, ESPButton.Position, ESPButton.Text, ESPButton.BackgroundColor3 = UDim2.new(0, 150, 0, 50), UDim2.new(0.05, 0, 0.85, 0), "ESP: OFF", Color3.fromRGB(255, 255, 0) -- Yellow for ESP
+ESPButton.TextColor3, ESPButton.Font, ESPButton.TextSize = Color3.fromRGB(0, 0, 0), Enum.Font.SourceSansBold, 18
+ESPButton.Parent = ScreenGui
+
+AimbotButton.Size, AimbotButton.Position, AimbotButton.Text, AimbotButton.BackgroundColor3 = UDim2.new(0, 150, 0, 50), UDim2.new(0.05, 0, 0.75, 0), "Aimbot: OFF", Color3.fromRGB(0, 0, 255) -- Blue for Aimbot
+AimbotButton.TextColor3, AimbotButton.Font, AimbotButton.TextSize = Color3.fromRGB(255, 255, 255), Enum.Font.SourceSansBold, 18
+AimbotButton.Parent = ScreenGui
+
+local ESPEnabled, AimbotEnabled = false, false
+
+-- Create ESP Box & Name above players
+local function createESP(character)
+    if not character or character:FindFirstChild("ESPBox") then return end
+
+    -- Highlight box around the player
+    local highlight = Instance.new("Highlight")
+    highlight.Name, highlight.Parent = "ESPBox", character
+    highlight.FillColor, highlight.FillTransparency = Color3.fromRGB(255, 0, 0), 0.5
+    highlight.OutlineColor, highlight.OutlineTransparency = Color3.fromRGB(255, 255, 255), 0.2
+
+    -- Display name and distance above the player
+    local textLabel = Instance.new("BillboardGui")
+    textLabel.Size, textLabel.Adornee, textLabel.StudsOffset = UDim2.new(0, 100, 0, 50), character:WaitForChild("Head"), Vector3.new(0, 2, 0)
+    textLabel.Parent, textLabel.AlwaysOnTop, textLabel.MaxDistance = character:WaitForChild("Head"), true, 1000 -- Increase max distance
+    local label = Instance.new("TextLabel")
+    label.Size, label.TextColor3, label.BackgroundTransparency, label.TextSize = UDim2.new(1, 0, 1, 0), Color3.fromRGB(255, 255, 255), 1, 14 -- Shrink text size
+    label.Text, label.Parent = character.Name .. " (0m)", textLabel
+
+    -- Update player distance every frame
+    RunService.RenderStepped:Connect(function()
+        if textLabel and character and character:FindFirstChild("HumanoidRootPart") then
+            local distance = math.floor((LocalPlayer.Character.HumanoidRootPart.Position - character.HumanoidRootPart.Position).Magnitude)
+            label.Text = character.Name .. " (" .. distance .. "m)"
+
+            -- Update visibility based on distance (make sure it's visible even from far away)
+            if distance > 300 then
+                label.TextTransparency = 0.6
+            else
+                label.TextTransparency = 0
+            end
+        end
+    end)
+end
+
+-- Remove ESP when player dies
+local function onPlayerDeath(player)
+    local character = player.Character
+    if character then
+        local espBox = character:FindFirstChild("ESPBox")
+        if espBox then
+            espBox:Destroy()
+        end
+
+        local textLabel = character:FindFirstChild("Head") and character.Head:FindFirstChild("BillboardGui")
+        if textLabel then
+            textLabel:Destroy()
+        end
+    end
+end
+
+-- Toggle ESP
+ESPButton.MouseButton1Click:Connect(function()
+    ESPEnabled = not ESPEnabled
+    ESPButton.Text, ESPButton.BackgroundColor3 = ESPEnabled and "ESP: ON" or "ESP: OFF", ESPEnabled and Color3.fromRGB(255, 255, 0) or Color3.fromRGB(100, 100, 100)
+    if ESPEnabled then
+        for _, player in pairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer and player.Character then
+                createESP(player.Character)
+            end
+        end
+    else
+        for _, player in pairs(Players:GetPlayers()) do
+            if player.Character then
+                local highlight = player.Character:FindFirstChild("ESPBox")
+                if highlight then highlight:Destroy() end
+
+                local textLabel = player.Character:FindFirstChild("Head") and player.Character.Head:FindFirstChild("BillboardGui")
+                if textLabel then textLabel:Destroy() end
+            end
+        end
+    end
+end)
+
+-- Toggle Aimbot
+AimbotButton.MouseButton1Click:Connect(function()
+    AimbotEnabled = not AimbotEnabled
+    AimbotButton.Text, AimbotButton.BackgroundColor3 = AimbotEnabled and "Aimbot: ON" or "Aimbot: OFF", AimbotEnabled and Color3.fromRGB(0, 0, 255) or Color3.fromRGB(100, 100, 100)
+end)
+
+-- Aimbot Logic (Follows mouse and locks onto head)
+local function aimbot()
+    if AimbotEnabled then
+        local closestTarget, shortestDistance = nil, math.huge
+        for _, player in pairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Head") then
+                local targetHead = player.Character.Head
+                local screenPosition = game.Workspace.CurrentCamera:WorldToScreenPoint(targetHead.Position)
+                local distance = (Vector2.new(mouse.X, mouse.Y) - Vector2.new(screenPosition.X, screenPosition.Y)).Magnitude
+                
+                if distance < shortestDistance then
+                    shortestDistance = distance
+                    closestTarget = targetHead
+                end
+            end
+        end
+        
+        if closestTarget then
+            local direction = (closestTarget.Position - game.Workspace.CurrentCamera.CFrame.Position).unit
+            game.Workspace.CurrentCamera.CFrame = CFrame.new(game.Workspace.CurrentCamera.CFrame.Position, closestTarget.Position)
+        end
+    end
+end
+
+-- Update aimbot every frame
+RunService.RenderStepped:Connect(aimbot)
+
+-- Auto remove ESP on player death
+Players.PlayerAdded:Connect(function(player)
+    player.CharacterAdded:Connect(function(character)
+        if ESPEnabled then
+            createESP(character)
+        end
+    end)
+    player.CharacterRemoving:Connect(function()
+        onPlayerDeath(player)
+    end)
+end)
+
+print("UI and Aimbot/ESP buttons are ready!")
